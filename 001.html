@@ -28,7 +28,7 @@
         function setup() {
             program = makeProgram()
             offset_series = symmetrize(
-                reverse(arange(program.length)))
+                reverse(arange(program.length, random([1, 2, 3]))))
         }
 
         function draw() {

@@ -1,7 +1,8 @@
-function arange(n) {
+function arange(n, step=1) {
     // generate an array with entries 0 .. n-1
+    length = Math.floor(n / step)
     a = new Array(n)
-    for (let i = 0; i < n; ++i) {
+    for (let i = 0; i < n; i+= step) {
         a[i] = i;
     }
     return a;
