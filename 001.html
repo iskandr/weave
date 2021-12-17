@@ -13,7 +13,7 @@
         var program;
         var offset_series;
 
-        function makeProgram(min_length=8, max_length=45, transition_prob=0.25) {
+        function makeProgram(min_length=5, max_length=200, transition_prob=0.25) {
             const length = randInt(min_length, max_length)
             const program = new Array(length)
             var last_state = randBool(0.5)
@@ -30,7 +30,7 @@
             offset_length = randInt(
                 Math.min(program.length / 2),
                 2 * program.length)
-            offset_series = arange(program.length, random([1, 2, 3, 4, 5]));
+            offset_series = arange(program.length, random([1, 2, 3, 4, 5, 6]));
             if (randBool()) {
                 offset_series = reverse(offset_series)
             }
