@@ -1,0 +1,70 @@
+<html>
+
+<head>
+    <title>Weave experiment #001</title>
+    <script src="rand.js"></script>
+    <script src="misc.js"></script>
+    <script type="application/javascript">
+        const max_pixels_x = 1500;
+        const max_pixels_y = 900;
+        const pixels_per_thread = 6;
+        const max_threads_x = max_pixels_x / pixels_per_thread;
+        const max_threads_y = max_pixels_y / pixels_per_thread;
+        var program;
+        var offset_series;
+
+        function makeProgram(min_length=8, max_length=45, transition_prob=0.25) {
+            const length = randInt(min_length, max_length)
+            const program = new Array(length)
+            var last_state = randBool(0.5)
+            program[0] = last_state
+            for (let i = 1; i < length; ++i) {
+                last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
+                program[i] = last_state
+            }
+            return program
+        }
+
+        function setup() {
+            program = makeProgram()
+            offset_series = symmetrize(
+                reverse(arange(program.length)))
+        }
+
+        function draw() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+
+            for (let i = 0; i < max_threads_x; ++i) {
+                for (let j = 0; j < max_threads_y; ++j) {
+                    const start_x = i * pixels_per_thread;
+                    const start_y = j * pixels_per_thread;
+                    const end_x = (i + 1) * pixels_per_thread;
+                    const end_y = start_y;
+                    ctx.beginPath();
+                    ctx.moveTo(start_x, start_y);
+                    ctx.lineWidth = pixels_per_thread;
+                    ctx.shadowBlur = 3;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    ctx.shadowColor = `hsla(50, 20%, 80%, 1)`
+                    const offset = offset_series[j % offset_series.length]
+                    const program_element = program[(i + offset) % program.length]
+                    ctx.strokeStyle = `hsla(10, ${program_element ? 100 : 0}%, 80%, 1.0)`
+                    ctx.lineTo(end_x, end_y)
+                    ctx.stroke();
+                }
+            }
+        }
+        setup();
+        window.onload = draw;
+
+
+    </script>
+</head>
+<body>
+<main>
+    <canvas id="canvas" width="1600" height="1600"></canvas>
+</main>
+</body>
+</html>
