@@ -6,7 +6,7 @@ function randInt(min, max) {
 }
 
 
-function randBool(p) {
+function randBool(p=0.5) {
     return rand() > p
 }
 

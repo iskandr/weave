@@ -27,8 +27,16 @@
 
         function setup() {
             program = makeProgram()
-            offset_series = symmetrize(
-                reverse(arange(program.length, random([1, 2, 3]))))
+            offset_length = randInt(
+                Math.min(program.length / 2),
+                2 * program.length)
+            offset_series = arange(program.length, random([1, 2, 3, 4, 5]));
+            if (randBool()) {
+                offset_series = reverse(offset_series)
+            }
+            if (randBool()) {
+                offset_series = symmetrize(offset_series)
+            }
         }
 
         function draw() {
@@ -44,10 +52,6 @@
                     ctx.beginPath();
                     ctx.moveTo(start_x, start_y);
                     ctx.lineWidth = pixels_per_thread;
-                    ctx.shadowBlur = 3;
-                    ctx.shadowOffsetX = 2;
-                    ctx.shadowOffsetY = 2;
-                    ctx.shadowColor = `hsla(50, 20%, 80%, 1)`
                     const offset = offset_series[j % offset_series.length]
                     const program_element = program[(i + offset) % program.length]
                     ctx.strokeStyle = `hsla(10, ${program_element ? 100 : 0}%, 80%, 1.0)`
