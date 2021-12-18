@@ -1,20 +1,23 @@
 <html>
 
 <head>
-    <title>Weave experiment #001</title>
+    <title>Weave experiment #003</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
     <script src="rand.js"></script>
     <script src="misc.js"></script>
     <script type="application/javascript">
-        const max_pixels_x = 1200;
-        const max_pixels_y = 700;
+        const max_pixels_x = 1000;
+        const max_pixels_y = 600;
         const pixels_per_thread = 6;
         const max_threads_x = max_pixels_x / pixels_per_thread;
         const max_threads_y = max_pixels_y / pixels_per_thread;
         var program;
         var offset_series;
+        var transition_prob = 0.25;
 
-        function makeProgram(min_length=5, max_length=200, transition_prob=0.25) {
+        function makeProgram(min_length=5, max_length=200) {
             const length = randInt(min_length, max_length)
+
             const program = new Array(length)
             var last_state = randBool(0.5)
             program[0] = last_state
@@ -39,9 +42,31 @@
             }
         }
 
+        function set_seed_from_slider() {
+            seed_slider = document.getElementById("seed")
+            seed = parseInt(seed_slider.value);
+            setSeed(seed);
+            setup();
+            draw();
+        }
+        function set_prob_from_slider() {
+            prob_slider = document.getElementById("prob")
+            transition_prob = parseFloat(prob_slider.value);
+            setup();
+            draw();
+        }
+
+        function onload() {
+            setup();
+            document.getElementById("seed").addEventListener("input", set_seed_from_slider);
+            document.getElementById("prob").addEventListener("input", set_prob_from_slider);
+            draw();
+        }
         function draw() {
+
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             for (let i = 0; i < max_threads_x; ++i) {
                 for (let j = 0; j < max_threads_y; ++j) {
@@ -60,15 +85,23 @@
                 }
             }
         }
-        setup();
-        window.onload = draw;
-
-
+        window.addEventListener("load", onload);
     </script>
 </head>
 <body>
-<main>
-    <canvas id="canvas" width="1200" height="700"></canvas>
-</main>
+
+<center class="canvasWrapper">
+    <canvas id="canvas" class="squareCanvas" ></canvas>
+</center>
+<div class="inputWrapper">
+    <group>
+        <label>Seed</label>
+        <input type="range" id="seed" name="seed" value="10" min="8" max="1000" step="1">
+    </group>
+    <group>
+        <label>Prob transition</label>
+        <input type="range" id="prob" name="prob" value="0.25" min="0" max="1" step="0.01">
+    </group>
+</div>
 </body>
 </html>
