@@ -1,0 +1,133 @@
+<html>
+
+<head>
+    <title>Weave experiment #004</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="rand.js"></script>
+    <script src="misc.js"></script>
+    <script type="application/javascript">
+        const pixels_per_thread = 6;
+        var program;
+        var offset_series;
+        var transition_prob = 0.25;
+        var base_row_color;
+        var base_col_color;
+
+        function makeProgram(min_length=5, max_length=200) {
+            const length = randInt(min_length, max_length)
+            base_row_color = randInt(1, 200);
+            base_col_color = randInt(1, 200);
+
+            const program = new Array(length)
+            var last_state = randBool(0.5)
+            program[0] = last_state
+            for (let i = 1; i < length; ++i) {
+                last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
+                program[i] = last_state
+            }
+            return program
+        }
+
+        function setup() {
+            program = makeProgram()
+            offset_length = randInt(
+                Math.min(program.length / 2),
+                2 * program.length)
+            offset_series = arange(program.length, choose([1, 2, 3, 4, 5, 6]));
+            if (randBool()) {
+                offset_series = reverse(offset_series)
+            }
+            if (randBool()) {
+                offset_series = symmetrize(offset_series)
+            }
+        }
+
+        function set_seed_from_slider() {
+            seed_slider = document.getElementById("seed")
+            seed = parseInt(seed_slider.value);
+            setSeed(seed);
+            setup();
+            draw();
+        }
+        function set_prob_from_slider() {
+            prob_slider = document.getElementById("prob")
+            transition_prob = parseFloat(prob_slider.value);
+            setup();
+            draw();
+        }
+
+        function onload() {
+            setup();
+            document.getElementById("seed").addEventListener("input", set_seed_from_slider);
+            document.getElementById("prob").addEventListener("input", set_prob_from_slider);
+            draw();
+        }
+        function draw() {
+
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const max_pixels_x = canvas.width;
+            const max_pixels_y = canvas.height;
+
+            const max_threads_x = max_pixels_x / pixels_per_thread;
+            const max_threads_y = max_pixels_y / pixels_per_thread;
+            const col_colors = new Array(max_threads_x);
+            for (let i = 0; i < max_threads_x; ++i) {
+                col_colors[i] = base_col_color + randInt(-4,4);
+            }
+            const row_colors = new Array(max_threads_y);
+            for (let i = 0; i < max_threads_y; ++i) {
+                row_colors[i] = base_row_color + randInt(-4,4);
+            }
+            const row_saturations = new Array(max_threads_y);
+            for (let i = 0; i < max_threads_y; ++i) {
+                row_saturations[i] = Math.min(100, 15 + randRound(randInt(85, 95)*i/max_threads_y));
+            }
+
+
+
+            for (let i = 0; i < max_threads_x; ++i) {
+                const col_color = col_colors[i]
+                for (let j = 0; j < max_threads_y; ++j) {
+                    const row_color = row_colors[j];
+
+                    const start_x = i * pixels_per_thread;
+                    const start_y = j * pixels_per_thread;
+                    const end_x = (i + 1) * pixels_per_thread;
+                    const end_y = start_y;
+                    ctx.beginPath();
+                    ctx.moveTo(start_x, start_y);
+                    ctx.lineWidth = pixels_per_thread;
+                    const offset = offset_series[j % offset_series.length]
+                    const program_element = program[(i + offset) % program.length]
+                    const hue = program_element ? row_color : col_color;
+
+                    const saturation = program_element ? row_saturations[j] : 20;
+                    const lightness = program_element ? 20 : 80;
+                    ctx.strokeStyle = `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
+                    ctx.lineTo(end_x, end_y)
+                    ctx.stroke();
+                }
+            }
+        }
+        window.addEventListener("load", onload);
+    </script>
+</head>
+<body>
+
+<center class="canvasWrapper">
+    <canvas id="canvas" class="squareCanvas" ></canvas>
+</center>
+<div class="inputWrapper">
+    <group>
+        <label>Seed</label>
+        <input type="range" id="seed" name="seed" value="10" min="8" max="1000" step="1">
+    </group>
+    <group>
+        <label>Prob transition</label>
+        <input type="range" id="prob" name="prob" value="0.25" min="0" max="1" step="0.01">
+    </group>
+</div>
+</body>
+</html>

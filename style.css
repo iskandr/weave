@@ -16,8 +16,9 @@ label {
 }
 
 .squareCanvas {
-    max-width: 600px;
+    max-width: 1200px;
     width: 100%;
+    min-height: 600px;
 }
 
 .inputWrapper {
