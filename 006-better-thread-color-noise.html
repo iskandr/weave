@@ -6,18 +6,18 @@
     <script src="rand.js"></script>
     <script src="array.js"></script>
     <script type="application/javascript">
-        var pixels_per_thread = 6;
-        var transition_prob = 0.25;
-        var base_row_color;
-        var base_col_color;
+        var pixels_per_thread;
+        var transition_prob;
+        var base_row_hue;
+        var base_col_hue;
 
         var program;
         var offset_series;
 
         function makeProgram(min_length=5, max_length=200) {
             const length = randInt(min_length, max_length)
-            base_row_color = randInt(1, 200);
-            base_col_color = randInt(1, 200);
+            base_row_hue = randInt(1, 360);
+            base_col_hue = randInt(1, 360);
 
             const program = new Array(length)
             var last_state = randBool(0.5)
@@ -88,27 +88,23 @@
 
             const max_threads_x = max_pixels_x / pixels_per_thread;
             const max_threads_y = max_pixels_y / pixels_per_thread;
-            const col_colors = new Array(max_threads_x);
-            for (let i = 0; i < max_threads_x; ++i) {
-                col_colors[i] = base_col_color + randInt(-4,4);
-            }
-            const row_colors = new Array(max_threads_y);
-            for (let i = 0; i < max_threads_y; ++i) {
-                row_colors[i] = base_row_color + randInt(-4,4);
-            }
-            const row_saturations = new Array(max_threads_y);
-            for (let i = 0; i < max_threads_y; ++i) {
-                // row_saturations[i] = Math.min(100, 15 + randRound(randInt(85, 95)*i/max_threads_y));
-                row_saturations[i] = 90;
-            }
-
-
+            const col_hsl = array2d(max_threads_x, 3);
+            const row_hsl = array2d(max_threads_y, 3);
 
             for (let i = 0; i < max_threads_x; ++i) {
-                const col_color = col_colors[i]
+                col_hsl[i][0] = base_col_hue + randInt(-3,3);
+                col_hsl[i][1] = 20 + randInt(2, -2)
+                col_hsl[i][2] = 20 + randInt(2, -2)
+            }
+            for (let i = 0; i < max_threads_y; ++i) {
+                row_hsl[i][0] = base_row_hue + randInt(-3,3);
+                row_hsl[i][1] = 90 + randInt(-2, 2);
+                row_hsl[i][2] = 80 + randInt(-2, 2);
+            }
+
+
+            for (let i = 0; i < max_threads_x; ++i) {
                 for (let j = 0; j < max_threads_y; ++j) {
-                    const row_color = row_colors[j];
-
                     const start_x = i * pixels_per_thread;
                     const start_y = j * pixels_per_thread;
                     const end_x = (i + 1) * pixels_per_thread;
@@ -118,10 +114,9 @@
                     ctx.lineWidth = pixels_per_thread;
                     const offset = offset_series[j % offset_series.length]
                     const program_element = program[(i + offset) % program.length]
-                    const hue = program_element ? row_color : col_color;
-
-                    const saturation = program_element ? row_saturations[j] : 20;
-                    const lightness = program_element ? 20 : 80;
+                    const hue = program_element ? row_hsl[j][0] : col_hsl[i][0];
+                    const saturation = program_element ? row_hsl[j][1] : col_hsl[i][1];
+                    const lightness = program_element ? row_hsl[j][2] : col_hsl[i][2];
                     ctx.strokeStyle = `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
                     ctx.lineTo(end_x, end_y)
                     ctx.stroke();
