@@ -28,8 +28,8 @@
         }
 
         function setup() {
-            base_row_hue = randInt(1, 90);
-            base_col_hue = randInt(200, 360);
+            base_row_hue = randInt(1, 100);
+            base_col_hue = randInt(base_row_hue + 50, 360);
 
             program = makeProgram()
             offset_series = arange(program.length, choose([1, 2, 3, 4, 5, 6, 8]));
@@ -104,12 +104,12 @@
             const row_hsl = array2d(max_threads_y, 3);
 
             for (let i = 0; i < max_threads_x; ++i) {
-                col_hsl[i][0] = base_col_hue + randInt(-1,1);
-                col_hsl[i][1] = 20 + randInt(1, -1)
-                col_hsl[i][2] = 10 + randInt(1, -1)
+                col_hsl[i][0] = base_col_hue + randInt(-2,2);
+                col_hsl[i][1] = randInt(25, 35) // + randInt(1, -1)
+                col_hsl[i][2] = randInt(5,15) // + randInt(1, -1)
             }
             for (let i = 0; i < max_threads_y; ++i) {
-                row_hsl[i][0] = base_row_hue + randInt(-1,1);
+                row_hsl[i][0] = base_row_hue + randInt(-10,10);
                 row_hsl[i][1] = 90 + randInt(-1, 1);
                 row_hsl[i][2] = 80 + randInt(-1, 1);
             }
@@ -134,12 +134,12 @@
                     } else {
                         gradient = ctx.createLinearGradient(start_x, start_y, start_x, end_y);
                     }
-                    gradient.addColorStop(0, `hsla( ${hue}, ${saturation}%, ${0.1 * lightness}%, 1.0)`);
+                    gradient.addColorStop(0, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
                     gradient.addColorStop(0.2,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
 
-                    gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
+                    //gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
                     gradient.addColorStop(0.8,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
-                    gradient.addColorStop(1, `hsla( ${hue}, ${saturation}%, ${0.1 * lightness}%, 1.0)`);
+                    gradient.addColorStop(1, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
                     // ctx.fillStyle=gradient;
                     ctx.strokeStyle = gradient // `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
                     if (row_flag) {
