@@ -100,15 +100,25 @@
                 document.getElementById(element_id).value = query_value
             }
         }
+        let reactive_sliders = [
+            "seed",
+            "prob",
+            "pixels-per-thread",
+            "pattern-length",
+            "pattern-height",
+        ]
+
+        function update_query_string() {
+            let search_params = new URLSearchParams(window.location.search);
+            for (name of reactive_sliders) {
+                let value = document.getElementById(name).value;
+                search_params.set(name, value);
+            }
+            window.location.search = search_params.toString();
+        }
+
         function onload() {
-            let reactive = [
-                "seed",
-                "prob",
-                "pixels-per-thread",
-                "pattern-length",
-                "pattern-height",
-            ]
-            for (name of reactive) {
+            for (name of reactive_sliders) {
                 set_if_query(name);
                 let elt = document.getElementById(name);
                 if (!elt) { alert(name + " not found"); }
@@ -116,8 +126,11 @@
                     elt.addEventListener("input", regenerate);
                 }
             }
+            document.getElementById("link").addEventListener("click", update_query_string)
             regenerate();
         }
+
+
         function draw() {
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
@@ -228,7 +241,7 @@
         <label>Pattern height</label>
         <input type="range" id="pattern-height" value="2" min="1" max="20" step="1">
     </group>
-
+    <button id="link">🔗</button>
 </div>
 </body>
 </html>
