@@ -10,51 +10,38 @@
         var transition_prob;
         var base_row_hue;
         var base_col_hue;
-        var min_pattern_length;
-        var max_pattern_length;
-        var min_pattern_height;
-        var max_pattern_height;
+        var pattern_length;
+        var pattern_height;
         var program;
         var offset_series;
+        var start_prob = 0.5;
+
 
         class Program {
-            constructor(num_rows, num_cols, pattern, offset_series) {
-                this.num_rows = num_rows;
-                this.num_cols = num_cols;
+            constructor(pattern, offset_series) {
                 this.pattern = pattern;
                 this.offset_series = offset_series;
             }
         }
-        function makeProgram(
-                min_length=5,
-                max_length=200,
-                min_height=1,
-                max_height=5) {
-            if (max_length < min_length) {
-                max_length = min_length;
-            }
-            if (max_height < min_height) {
-                max_height = min_height;
-            }
-            const length = randInt(min_length, max_length)
-            const height = randInt(min_height, max_height);
-            // const pattern = array2d(height, length);
-            const program = new Array(length);
-            var last_state = randBool(0.5)
-            program[0] = last_state
+        function makeRow(length) {
+            const pattern = new Array(length);
+            var last_state = randBool(start_prob);
+            pattern[0] = last_state;
             for (let i = 1; i < length; ++i) {
                 last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
-                program[i] = last_state
+                pattern[i] = last_state
             }
-            return program
+            return pattern;
         }
-
-        function setup() {
-            base_row_hue = randInt(1, 100);
-            base_col_hue = randInt(base_row_hue + 50, 360);
-
-            program = makeProgram(min_pattern_length, max_pattern_length)
-            offset_series = arange(program.length, choose([1, 2, 3, 4, 5, 6, 8]));
+        function makePattern(height, length) {
+            const pattern = new Array(height);
+            for (let i = 0; i < height; ++i) {
+                pattern[i]  = makeRow(length);
+            }
+            return pattern;
+        }
+        function makeOffsets(length, step_values=[1, 2, 3, 4, 5, 6, 8]) {
+            offset_series = arange(length, choose(step_values));
 
             if (randBool()) {
                 offset_series = subsample(offset_series)
@@ -68,16 +55,26 @@
             if (randBool()) {
                 offset_series = symmetrize(offset_series)
             }
+            return offset_series;
+        }
+        function makeProgram() {
+            const pattern = makePattern(pattern_height, pattern_length);
+            const offsets = makeOffsets(pattern_length);
+            return new Program(pattern, offsets);
+        }
+
+        function setup() {
+            base_row_hue = randInt(1, 100);
+            base_col_hue = randInt(base_row_hue + 50, 360);
+            program = makeProgram()
         }
 
         function regenerate() {
             setSeed(parseInt(document.getElementById("seed").value));
             transition_prob = parseFloat(document.getElementById("prob").value);
             pixels_per_thread = parseInt(document.getElementById("pixels-per-thread").value);
-            min_pattern_length = parseInt(document.getElementById("min-pattern-length").value);
-            max_pattern_length = parseInt(document.getElementById("max-pattern-length").value);
-            min_pattern_height = parseInt(document.getElementById("min-pattern-height").value);
-            max_pattern_height = parseInt(document.getElementById("max-pattern-height").value);
+            pattern_length = parseInt(document.getElementById("pattern-length").value);
+            pattern_height = parseInt(document.getElementById("pattern-height").value);
 
             setup();
             draw();
@@ -108,10 +105,8 @@
                 "seed",
                 "prob",
                 "pixels-per-thread",
-                "min-pattern-length",
-                "max-pattern-length",
-                "min-pattern-height",
-                "max-pattern-height"
+                "pattern-length",
+                "pattern-height",
             ]
             for (name of reactive) {
                 set_if_query(name);
@@ -126,8 +121,10 @@
         function draw() {
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            //ctx.translate(0.5,0.5);
 
             ctx.lineWidth = pixels_per_thread;
             /*
@@ -154,19 +151,21 @@
             }
 
 
-            for (let i = 0; i < max_threads_x; ++i) {
-                for (let j = 0; j < max_threads_y; ++j) {
-                    const start_x = i * pixels_per_thread;
-                    const start_y = j * pixels_per_thread;
-                    const end_x = (i + 1) * pixels_per_thread;
-                    const end_y = (j + 1) * pixels_per_thread;
-                    ctx.beginPath();
-                    ctx.moveTo(start_x, start_y);
-                    const offset = offset_series[j % offset_series.length]
-                    const row_flag = program[(i + offset) % program.length]
-                    const hue = row_flag ? row_hsl[j][0] : col_hsl[i][0];
-                    const saturation = row_flag ? row_hsl[j][1] : col_hsl[i][1];
-                    const lightness = row_flag ? row_hsl[j][2] : col_hsl[i][2];
+            for (let col = 0; col < max_threads_x; ++col) {
+                const start_x = col * pixels_per_thread;
+                const end_x = (col + 1) * pixels_per_thread;
+                for (let row = 0; row < max_threads_y; ++row) {
+                    const start_y = row * pixels_per_thread;
+                    const end_y = (row + 1) * pixels_per_thread;
+                    const row_in_pattern = row % pattern_height;
+                    const repeat_number = Math.floor(row / pattern_height);
+                    const offset = offset_series[repeat_number % program.offset_series.length]
+                    const col_in_pattern = (col + offset) % pattern_length
+                    const row_flag = program.pattern[row_in_pattern][col_in_pattern]
+                    const hue = row_flag ? row_hsl[row][0] : col_hsl[col][0];
+                    const saturation = row_flag ? row_hsl[row][1] : col_hsl[col][1];
+                    const lightness = row_flag ? row_hsl[row][2] : col_hsl[col][2];
+                    /*
                     var gradient;
                     if (row_flag) {
                         gradient = ctx.createLinearGradient(start_x  , start_y, end_x, start_y);
@@ -180,11 +179,19 @@
                     gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
                     gradient.addColorStop(1, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
                     //ctx.fillStyle=gradient;
-                    ctx.strokeStyle = gradient // `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
+                    */
+                    ctx.beginPath();
+                    ctx.strokeStyle = `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
+
                     if (row_flag) {
-                        ctx.lineTo(end_x, start_y)
+                        let middle_y = (start_y + end_y) / 2;
+                        ctx.moveTo(start_x, middle_y);
+                        ctx.lineTo(end_x, middle_y);
                     } else {
-                        ctx.lineTo(start_x, end_y)
+                        let middle_x = (start_x + end_x) / 2;
+                        ctx.moveTo(middle_x, start_y);
+
+                        ctx.lineTo(middle_x, end_y)
                     }
                     ctx.stroke();
 
@@ -210,26 +217,18 @@
     </group>
     <group>
         <label>Pixels per thread</label>
-        <input type="range" id="pixels-per-thread"  value="6" min="2" max="10" step="4">
+        <input type="range" id="pixels-per-thread"  value="10" min="2" max="10" step="4">
     </group>
     <group>
-        <label>Min pattern length</label>
-        <input type="range" id="min-pattern-length" value="5" min="1" max="200" step="1">
-    </group>
-     <group>
-        <label>Max pattern length</label>
-        <input type="range" id="max-pattern-length"  value="200" min="1" max="200" step="1">
+        <label>Pattern length</label>
+        <input type="range" id="pattern-length" value="10" min="1" max="200" step="1">
     </group>
 
      <group>
-        <label>Min pattern height</label>
-        <input type="range" id="min-pattern-height" value="1" min="1" max="20" step="1">
+        <label>Pattern height</label>
+        <input type="range" id="pattern-height" value="2" min="1" max="20" step="1">
     </group>
 
-     <group>
-        <label>Max pattern height</label>
-        <input type="range" id="max-pattern-height" name="max-pattern-height" value="20" min="1" max="20" step="1">
-    </group>
 </div>
 </body>
 </html>
