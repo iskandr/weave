@@ -1,0 +1,276 @@
+<html>
+
+<head>
+    <title>Weave experiment #004</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="rand.js"></script>
+    <script src="array.js"></script>
+    <script type="application/javascript">
+        var pixels_per_thread;
+        var transition_prob;
+        var base_row_hue;
+        var base_col_hue;
+        var pattern_length;
+        var pattern_height;
+        var program;
+        var offset_series;
+        var start_prob = 0.5;
+
+        class Program {
+            constructor(num_rows, num_cols, pattern, offset_series) {
+                this.num_rows = num_rows;
+                this.num_cols = num_cols;
+                this.pattern = pattern;
+                this.offset_series = offset_series;
+            }
+
+            make_binary_matrix(matrix_rows, matrix_cols) {
+                // renders the pattern and offset series into a larger
+                // binary matrix
+                //alert(`${this.num_rows}, ${this.num_cols}, ${matrix_rows}, ${matrix_cols}`)
+                let result = array2d(matrix_rows, matrix_cols)
+                for (let col = 0; col < matrix_cols; ++col) {
+                    for (let row = 0; row < matrix_rows; ++row) {
+                        const row_in_pattern = row % this.num_rows;
+                        const repeat_number = Math.floor(row / this.num_rows);
+                        const offset = offset_series[repeat_number % this.offset_series.length]
+                        const col_in_pattern = (col + offset) % this.num_cols;
+                        result[row][col] = this.pattern[row_in_pattern][col_in_pattern]
+                    }
+                }
+                return result;
+            }
+        }
+
+        function makeRow(num_cols) {
+            const pattern = new Array(num_cols);
+            var last_state = randBool(start_prob);
+            pattern[0] = last_state;
+            for (let i = 1; i < length; ++i) {
+                last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
+                pattern[i] = last_state
+            }
+            return pattern;
+        }
+        function makePattern(height, length) {
+            const pattern = new Array(height);
+            for (let i = 0; i < height; ++i) {
+                pattern[i]  = makeRow(length);
+            }
+            return pattern;
+        }
+        function makeOffsets(length, step_values=[1, 2, 3, 4, 5, 6, 8]) {
+            offset_series = arange(length, choose(step_values));
+
+            if (randBool()) {
+                offset_series = subsample(offset_series)
+            }
+            if (randBool()) {
+                offset_series = offset_series.map(x => x ** 2)
+            }
+            if (randBool()) {
+                offset_series = reverse(offset_series)
+            }
+            if (randBool()) {
+                offset_series = symmetrize(offset_series)
+            }
+            return offset_series;
+        }
+        function makeProgram(height, length) {
+            const pattern = makePattern(height, length);
+            const offsets = makeOffsets(length);
+            return new Program(height, length, pattern, offsets);
+        }
+
+        function setup() {
+            base_row_hue = randInt(1, 100);
+            base_col_hue = randInt(base_row_hue + 50, 360);
+            program = makeProgram(pattern_height, pattern_length);
+        }
+
+        function regenerate() {
+            setSeed(parseInt(document.getElementById("seed").value));
+            transition_prob = parseFloat(document.getElementById("prob").value);
+            pixels_per_thread = parseInt(document.getElementById("pixels-per-thread").value);
+            pattern_length = parseInt(document.getElementById("pattern-length").value);
+            pattern_height = parseInt(document.getElementById("pattern-height").value);
+
+            setup();
+            draw();
+        }
+
+        function getQueryVariable(variable) {
+            var query = window.location.search.substring(1);
+            var vars = query.split('&');
+            for (var i = 0; i < vars.length; i++) {
+                var pair = vars[i].split('=');
+                if (decodeURIComponent(pair[0]) == variable) {
+                    return decodeURIComponent(pair[1]);
+                }
+            }
+        }
+
+        function set_if_query(query_name, element_id="") {
+            if (!element_id ) {
+                element_id = query_name;
+            }
+            const query_value = getQueryVariable(query_name)
+            if (query_value) {
+                document.getElementById(element_id).value = query_value
+            }
+        }
+        let reactive_sliders = [
+            "seed",
+            "prob",
+            "pixels-per-thread",
+            "pattern-length",
+            "pattern-height",
+        ]
+
+        function update_query_string() {
+            let search_params = new URLSearchParams(window.location.search);
+            for (name of reactive_sliders) {
+                let value = document.getElementById(name).value;
+                search_params.set(name, value);
+            }
+            window.location.search = search_params.toString();
+        }
+
+        function onload() {
+            for (name of reactive_sliders) {
+                set_if_query(name);
+                let elt = document.getElementById(name);
+                if (!elt) { alert(name + " not found"); }
+                else {
+                    elt.addEventListener("input", regenerate);
+                }
+            }
+            document.getElementById("link").addEventListener("click", update_query_string)
+            regenerate();
+        }
+
+        function warp_colors(max_threads_x) {
+            const col_hsl = array2d(max_threads_x, 3);
+
+            for (let i = 0; i < max_threads_x; ++i) {
+                col_hsl[i][0] = base_col_hue + randInt(-2,2);
+                col_hsl[i][1] = randInt(5, 10) // + randInt(1, -1)
+                col_hsl[i][2] = randInt(10,20) // + randInt(1, -1)
+            }
+            return col_hsl;
+
+        }
+
+        function weft_colors(max_threads_y) {
+            const row_hsl = array2d(max_threads_y, 3);
+            for (let i = 0; i < max_threads_y; ++i) {
+                row_hsl[i][0] = base_row_hue + randInt(-10,10);
+                row_hsl[i][1] = 90 + randInt(-1, 1);
+                row_hsl[i][2] = 80 + randInt(-1, 1);
+            }
+            return row_hsl;
+        }
+
+
+
+        function draw() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            //ctx.translate(0.5,0.5);
+
+            ctx.lineWidth = pixels_per_thread;
+            const max_pixels_x = canvas.width;
+            const max_pixels_y = canvas.height;
+
+            const max_threads_x = max_pixels_x / pixels_per_thread;
+            const max_threads_y = max_pixels_y / pixels_per_thread;
+
+            const col_hsl = warp_colors(max_threads_x);
+            const row_hsl = weft_colors(max_threads_y)
+
+            /*
+            ctx.lineCap='round';
+            ctx.lineJoin='round';
+            */
+
+            const draft = program.make_binary_matrix(max_threads_y, max_threads_x)
+
+            for (let col = 0; col < max_threads_x; ++col) {
+                const start_x = col * pixels_per_thread;
+                const end_x = (col + 1) * pixels_per_thread;
+                for (let row = 0; row < max_threads_y; ++row) {
+                    const start_y = row * pixels_per_thread;
+                    const end_y = (row + 1) * pixels_per_thread;
+                    const row_flag = draft[row][col]
+                    const hue = row_flag ? row_hsl[row][0] : col_hsl[col][0];
+                    const saturation = row_flag ? row_hsl[row][1] : col_hsl[col][1];
+                    const lightness = row_flag ? row_hsl[row][2] : col_hsl[col][2];
+                    /*
+                    var gradient;
+                    if (row_flag) {
+                        gradient = ctx.createLinearGradient(start_x  , start_y, end_x, start_y);
+                    } else {
+                        gradient = ctx.createLinearGradient(start_x , start_y, start_x, end_y);
+                    }
+                    gradient.addColorStop(0, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
+                    gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
+
+                    //gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
+                    gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
+                    gradient.addColorStop(1, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
+                    //ctx.fillStyle=gradient;
+                    */
+                    ctx.beginPath();
+                    ctx.strokeStyle = `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
+
+                    if (row_flag) {
+                        let middle_y = (start_y + end_y) / 2;
+                        ctx.moveTo(start_x, middle_y);
+                        ctx.lineTo(end_x, middle_y);
+                    } else {
+                        let middle_x = (start_x + end_x) / 2;
+                        ctx.moveTo(middle_x, start_y);
+
+                        ctx.lineTo(middle_x, end_y)
+                    }
+                    ctx.stroke();
+
+                }
+            }
+        }
+        window.addEventListener("load", onload);
+    </script>
+</head>
+<body>
+
+<center class="canvasWrapper">
+    <canvas id="canvas" class="squareCanvas" ></canvas>
+</center>
+<div class="inputWrapper">
+    <group>
+        <label>Seed</label>
+        <input type="range" id="seed" value="10" min="8" max="1000" step="1">
+    </group>
+    <group>
+        <label>Prob transition</label>
+        <input type="range" id="prob"  value="0.25" min="0" max="1" step="0.01">
+    </group>
+    <group>
+        <label>Pixels per thread</label>
+        <input type="range" id="pixels-per-thread"  value="10" min="2" max="10" step="4">
+    </group>
+    <group>
+        <label>Pattern length</label>
+        <input type="range" id="pattern-length" value="10" min="1" max="200" step="1">
+    </group>
+
+     <group>
+        <label>Pattern height</label>
+        <input type="range" id="pattern-height" value="2" min="1" max="20" step="1">
+    </group>
+    <button id="link">🔗</button>
+</div>
+</body>
+</html>
