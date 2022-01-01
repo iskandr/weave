@@ -1,7 +1,8 @@
 <html>
 
 <head>
-    <title>Weave experiment #004</title>
+    <title>Weave experiment #011</title>
+    <meta charset="utf-8">
     <link rel="stylesheet" type="text/css" href="style.css">
     <script src="rand.js"></script>
     <script src="array.js"></script>
@@ -16,37 +17,58 @@
         var offset_series;
         var start_prob = 0.5;
 
-        class Program {
-            constructor(num_rows, num_cols, pattern, offset_series) {
-                this.num_rows = num_rows;
-                this.num_cols = num_cols;
-                this.pattern = pattern;
+        class RepeatingPattern {
+            constructor(base_pattern_matrix, offset_series) {
+                this.base_num_rows = base_pattern_matrix.length;
+                this.base_num_cols = base_pattern_matrix[0].length;
+                this.base_pattern_matrix = base_pattern_matrix;
                 this.offset_series = offset_series;
             }
 
-            make_binary_matrix(matrix_rows, matrix_cols) {
+            make_binary_matrix(num_weft_rows, num_warp_cols) {
                 // renders the pattern and offset series into a larger
                 // binary matrix
-                //alert(`${this.num_rows}, ${this.num_cols}, ${matrix_rows}, ${matrix_cols}`)
-                let result = array2d(matrix_rows, matrix_cols)
-                for (let col = 0; col < matrix_cols; ++col) {
-                    for (let row = 0; row < matrix_rows; ++row) {
-                        const row_in_pattern = row % this.num_rows;
-                        const repeat_number = Math.floor(row / this.num_rows);
+                //alert(`${this.num_rows}, ${this.num_cols}, ${num_weft_rows}, ${num_warp_cols}`)
+                let result = array2d(num_weft_rows, num_warp_cols)
+                for (let col = 0; col < num_warp_cols; ++col) {
+                    for (let row = 0; row < num_weft_rows; ++row) {
+                        const row_in_pattern = row % this.base_num_rows;
+                        const repeat_number = Math.floor(row / this.base_num_rows);
                         const offset = offset_series[repeat_number % this.offset_series.length]
-                        const col_in_pattern = (col + offset) % this.num_cols;
-                        result[row][col] = this.pattern[row_in_pattern][col_in_pattern]
+                        const col_in_pattern = (col + offset) % this.base_num_cols;
+                        result[row][col] = this.base_pattern_matrix[row_in_pattern][col_in_pattern]
                     }
                 }
                 return result;
             }
         }
 
+        class Draft {
+            constructor(
+                    threading_matrix,
+                    tie_up,
+                    treadling_matrix) {
+                this.threading_matrix = threading_matrix;
+                this.tie_up = tie_up;
+                this.treadling_matrix = treadling_matrix;
+                this.num_frames = threading_matrix.length;
+                this.num_warp_cols = threading_matrix[0].length;
+                this.num_weft_rows = treadling_matrix.length;
+                this.num_pedals = treadling_matrix[0].length;
+            }
+            make_binary_matrix() {
+                return matmult(
+                    matmult(this.treadling_matrix, transpose(this.tie_up)),
+                    this.threading_matrix);
+            }
+
+        }
+
         function makeRow(num_cols) {
             const pattern = new Array(num_cols);
             var last_state = randBool(start_prob);
             pattern[0] = last_state;
-            for (let i = 1; i < length; ++i) {
+            for (let i = 1; i < num_cols; ++i) {
                 last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
                 pattern[i] = last_state
             }
@@ -76,10 +98,10 @@
             }
             return offset_series;
         }
-        function makeProgram(height, length) {
-            const pattern = makePattern(height, length);
-            const offsets = makeOffsets(length);
-            return new Program(height, length, pattern, offsets);
+        function makeProgram(num_rows, num_cols) {
+            const pattern = makePattern(num_rows, num_cols);
+            const offsets = makeOffsets(num_cols);
+            return new RepeatingPattern(pattern, offsets);
         }
 
         function setup() {
@@ -171,39 +193,16 @@
             return row_hsl;
         }
 
-
-
-        function draw() {
-            var canvas = document.getElementById('canvas');
-            var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            //ctx.translate(0.5,0.5);
-
-            ctx.lineWidth = pixels_per_thread;
-            const max_pixels_x = canvas.width;
-            const max_pixels_y = canvas.height;
-
-            const max_threads_x = max_pixels_x / pixels_per_thread;
-            const max_threads_y = max_pixels_y / pixels_per_thread;
-
-            const col_hsl = warp_colors(max_threads_x);
-            const row_hsl = weft_colors(max_threads_y)
-
-            /*
-            ctx.lineCap='round';
-            ctx.lineJoin='round';
-            */
-
-            const draft = program.make_binary_matrix(max_threads_y, max_threads_x)
-
-            for (let col = 0; col < max_threads_x; ++col) {
+        function draw_matrix(ctx, matrix, col_hsl, row_hsl) {
+             let num_weft_threads = matrix.length;
+             let num_warp_threads = matrix[0].length;
+             for (let col = 0; col < num_warp_threads; ++col) {
                 const start_x = col * pixels_per_thread;
                 const end_x = (col + 1) * pixels_per_thread;
-                for (let row = 0; row < max_threads_y; ++row) {
+                for (let row = 0; row < num_weft_threads; ++row) {
                     const start_y = row * pixels_per_thread;
                     const end_y = (row + 1) * pixels_per_thread;
-                    const row_flag = draft[row][col]
+                    const row_flag = matrix[row][col]
                     const hue = row_flag ? row_hsl[row][0] : col_hsl[col][0];
                     const saturation = row_flag ? row_hsl[row][1] : col_hsl[col][1];
                     const lightness = row_flag ? row_hsl[row][2] : col_hsl[col][2];
@@ -236,18 +235,95 @@
                         ctx.lineTo(middle_x, end_y)
                     }
                     ctx.stroke();
-
                 }
             }
+        }
+        function draw() {
+            draw_color_palette();
+            draw_warp_colors();
+            draw_weft_colors();
+            draw_threading();
+            draw_treadling();
+            draw_tieup();
+            draw_weave();
+        }
+        function get_canvas_context(canvas_id) {
+            var canvas = document.getElementById(canvas_id);
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return [ctx, canvas.width, canvas.height];
+        }
+
+        function draw_color_palette() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("color-palette");
+
+        }
+        function draw_warp_colors() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("warp-colors");
+        }
+        function draw_weft_colors() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("weft-colors");
+        }
+
+        function draw_threading() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("threading");
+
+        }
+        function draw_treadling() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("treadling");
+        }
+        function draw_tieup() {
+            [ctx, canvas_width, canvas_height] = get_canvas_context("tie-up");
+        }
+        function draw_weave() {
+
+            [ctx, max_pixels_x, max_pixels_y] = get_canvas_context("weave");
+
+            //ctx.translate(0.5,0.5);
+            ctx.lineWidth = pixels_per_thread;
+
+            const num_warp_threads = max_pixels_x / pixels_per_thread;
+            const num_weft_threads = max_pixels_y / pixels_per_thread;
+
+            const col_hsl = warp_colors(num_warp_threads);
+            const row_hsl = weft_colors(num_weft_threads)
+
+            /*
+            ctx.lineCap='round';
+            ctx.lineJoin='round';
+            */
+
+            const matrix = program.make_binary_matrix(num_weft_threads, num_warp_threads)
+            draw_matrix(ctx, matrix, col_hsl, row_hsl);
         }
         window.addEventListener("load", onload);
     </script>
 </head>
 <body>
 
-<center class="canvasWrapper">
-    <canvas id="canvas" class="squareCanvas" ></canvas>
-</center>
+<table border="1">
+    <tr>
+        <td colspan="3">
+            <canvas id="color-palette" style="height: 0px;" ></canvas>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="3">
+            <canvas id="warp-colors" style="height: 0px;"></canvas>
+        </td>
+    </tr>
+    <tr>
+        <td><canvas id="threading" style="height:10px;"></canvas></td>
+        <td colspan="2"><canvas id="tie-up" style="height: 10px;"></canvas></td>
+    </tr>
+    <tr>
+        <td><canvas id="weave" class="squareCanvas"></canvas></td>
+        <td><canvas id="treadling" style="width:10px;"></canvas></td>
+        <td><canvas id="weft-colors" style="width: 10px;"></canvas></td>
+    </tr>
+
+</table>
+
 <div class="inputWrapper">
     <group>
         <label>Seed</label>

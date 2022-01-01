@@ -111,3 +111,35 @@ function symmetrize(a) {
     // make series symmetric by concatenating it with its inverse
     return concat(a, reverse(a));
 }
+
+function matmult(A, B) {
+    let [ar, ac] = [A.length, A[0].length];
+    let [br, bc] = [B.length, B[0].length];
+    if (ac != br) {
+        window.alert(
+            `Invalid dimensions ${ar} x ${ac}, ${br} x ${bc}: expected ${ac} == ${br}`);
+        return;
+    }
+    let result = array2d(ar, bc)
+    for (let i = 0; i < ar; ++i) {
+        for (let j = 0; j < bc; ++j) {
+            result[i][j] = 0;
+            for (let k = 0; k < ac; ++k) {
+                result[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    return result;
+}
+
+function transpose(A) {
+    let ar = A.length;
+    let ac = A[0].length;
+    let result = array2d(ar, ac);
+    for (let i = 0; i < ar; ++i) {
+        for (let j = 0; j < ac; ++j) {
+            result[j][i] = A[i][j];
+        }
+    }
+    return result;
+}
