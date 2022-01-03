@@ -83,7 +83,7 @@ label {
         var program;
         var offset_series;
 
-        var start_prob = 0.5;
+        var start_prob = 0.9;
 
         class RepeatingPattern {
             constructor(base_pattern_matrix, offset_series) {
@@ -138,7 +138,7 @@ label {
             var last_state = randBool(start_prob);
             pattern[0] = last_state;
             for (let i = 1; i < num_cols; ++i) {
-                last_state = last_state ? randBool(transition_prob) : randBool(1 - transition_prob)
+                last_state = randBool(transition_prob)  ? !last_state  : last_state;
                 pattern[i] = last_state
             }
             return pattern;
@@ -154,7 +154,7 @@ label {
 
         function makeOffsets(length, step_values=[1, 2, 3, 4, 5, 6, 8]) {
             offset_series = arange(length, choose(step_values));
-
+            return offset_series;
             if (randBool()) {
                 offset_series = subsample(offset_series)
             }
@@ -217,13 +217,12 @@ label {
             let repeating_pattern = makeRepeatingPattern(
                 num_independent_rows_of_tie_up, num_independent_cols_of_tie_up)
             let tie_up = repeating_pattern.make_binary_matrix(num_frames, num_pedals)
-            let colsums = colsum(tie_up)
             // don't want any column of tie-up to be all ones or all zeros
-            for (let i = 0; i < colsums.length; ++i) {
-                if (colsums[i] == 0) {
+            for (let i = 0; i < num_pedals; ++i) {
+                while (colsum(tie_up)[i] < 2) {
                     tie_up[randInt(0, num_frames - 1)][i] = true;
                 }
-                while (colsum(tie_up)[i] >= num_frames - 1) {
+                while (colsum(tie_up)[i] >= num_frames - 2) {
                     tie_up[randInt(0, num_frames - 1)][i] = false;
                 }
             }
@@ -361,7 +360,6 @@ label {
                     //gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
                     gradient.addColorStop(0.5,`hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`);
                     gradient.addColorStop(1, `hsla( ${hue}, ${saturation}%, ${0.2 * lightness}%, 1.0)`);
-                    //ctx.fillStyle=gradient;
                     */
                     ctx.beginPath();
                     ctx.strokeStyle = `hsla( ${hue}, ${saturation}%, ${lightness}%, 1.0)`
@@ -500,11 +498,11 @@ label {
 
     <group>
         <label>Frames</label>
-        <input type="range" id="frames"  value="4" min="2" max="64" step="1">
+        <input type="range" id="frames"  value="4" min="4" max="50" step="1">
     </group>
     <group>
         <label>Pedals</label>
-        <input type="range" id="pedals"  value="10" min="2" max="150" step="1">
+        <input type="range" id="pedals"  value="10" min="4" max="100" step="1">
     </group>
 </div>
 <div class="inputWrapper">
