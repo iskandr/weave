@@ -187,16 +187,21 @@ label {
             let result = zeros2d(num_rows, num_cols);
             var previous = 0;
             var chosen;
+            var direction = 1;
             for (let row = 0; row < num_rows; row++) {
-                if (randBool(0.4)) {
+
+                if (randBool(0.3)) {
                     chosen = previous;
-                } else if (randBool(0.6)) {
-                    chosen = mod((previous + 1), num_cols);
-                } else if (randBool()) {
-                    chosen = mod((previous - 1), num_cols);
+
+                } else if (randBool(0.95)) {
+                    chosen = mod((previous + direction), num_cols);
                 } else {
                     chosen = randInt(0, num_cols - 1);
                 }
+                 if (randBool(0.05)) {
+                    direction = -direction;
+                }
+
                 result[row][chosen] = 1;
                 previous = chosen;
             }
