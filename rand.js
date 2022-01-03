@@ -18,12 +18,12 @@ function random() {
 
 function randInt(min, max) {
     let range = max - min;
-    return min + Math.floor(random() * range);
+    return min + Math.round(random() * range);
 }
 
 
 function randBool(p=0.5) {
-    return randFloat() > p
+    return randFloat() <= p
 }
 /*
 function randFloat(min, max) {

@@ -3,10 +3,77 @@
 <head>
     <title>Weave experiment #011</title>
     <meta charset="utf-8">
-    <link rel="stylesheet" type="text/css" href="style.css">
+    <style type="text/css">
+    body {
+    font-size: 16px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #444;
+}
+
+canvas {
+    padding: 0px;
+    margin: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+table {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0px;
+    align-content: center;
+
+}
+td { align-content: center; vertical-align: top; padding: 0px; margin: 0px;}
+tr { align-content: center; vertical-align: top; padding: 0px; margin: 0px;}
+
+label {
+    padding-bottom: 8px;
+}
+
+.inputWrapper {
+    margin: auto;
+    padding: 10px;
+    padding-top: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.inputWrapper group {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.inputWrapper group label {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    text-align: center;
+}
+
+.inputWrapper group input {
+    width: 150px;
+}
+
+#draft-container {
+    width: 100%;
+    text-align: center;
+}
+    </style>
     <script src="rand.js"></script>
     <script src="array.js"></script>
     <script type="application/javascript">
+        var num_warp_threads;
+        var num_weft_threads;
+        var num_frames;
+        var num_pedals
         var pixels_per_thread;
         var transition_prob;
         var base_row_hue;
@@ -15,6 +82,7 @@
         var pattern_height;
         var program;
         var offset_series;
+
         var start_prob = 0.5;
 
         class RepeatingPattern {
@@ -32,10 +100,10 @@
                 let result = array2d(num_weft_rows, num_warp_cols)
                 for (let col = 0; col < num_warp_cols; ++col) {
                     for (let row = 0; row < num_weft_rows; ++row) {
-                        const row_in_pattern = row % this.base_num_rows;
+                        const row_in_pattern = mod(row, this.base_num_rows);
                         const repeat_number = Math.floor(row / this.base_num_rows);
-                        const offset = offset_series[repeat_number % this.offset_series.length]
-                        const col_in_pattern = (col + offset) % this.base_num_cols;
+                        const offset = offset_series[mod(repeat_number, this.offset_series.length)]
+                        const col_in_pattern = mod((col + offset), this.base_num_cols);
                         result[row][col] = this.base_pattern_matrix[row_in_pattern][col_in_pattern]
                     }
                 }
@@ -56,9 +124,10 @@
                 this.num_weft_rows = treadling_matrix.length;
                 this.num_pedals = treadling_matrix[0].length;
             }
+
             make_binary_matrix() {
-                return matmult(
-                    matmult(this.treadling_matrix, transpose(this.tie_up)),
+                return binary_matmult(
+                    binary_matmult(this.treadling_matrix, transpose(this.tie_up)),
                     this.threading_matrix);
             }
 
@@ -74,6 +143,7 @@
             }
             return pattern;
         }
+
         function makePattern(height, length) {
             const pattern = new Array(height);
             for (let i = 0; i < height; ++i) {
@@ -81,12 +151,18 @@
             }
             return pattern;
         }
+
         function makeOffsets(length, step_values=[1, 2, 3, 4, 5, 6, 8]) {
             offset_series = arange(length, choose(step_values));
 
             if (randBool()) {
                 offset_series = subsample(offset_series)
             }
+
+            if (randBool()) {
+                offset_series = interleave(offset_series, offset_series);
+            }
+
             if (randBool()) {
                 offset_series = offset_series.map(x => x ** 2)
             }
@@ -96,26 +172,76 @@
             if (randBool()) {
                 offset_series = symmetrize(offset_series)
             }
+            if (randBool()) {
+                offset_series = interleave(offset_series, offset_series);
+            }
             return offset_series;
         }
-        function makeProgram(num_rows, num_cols) {
+        function makeRepeatingPattern(num_rows, num_cols) {
             const pattern = makePattern(num_rows, num_cols);
             const offsets = makeOffsets(num_cols);
             return new RepeatingPattern(pattern, offsets);
         }
 
+        function randomWalkMatrix(num_rows, num_cols) {
+            let result = zeros2d(num_rows, num_cols);
+            var previous = 0;
+            var chosen;
+            for (let row = 0; row < num_rows; row++) {
+                if (randBool(0.4)) {
+                    chosen = previous;
+                } else if (randBool(0.6)) {
+                    chosen = mod((previous + 1), num_cols);
+                } else if (randBool()) {
+                    chosen = mod((previous - 1), num_cols);
+                } else {
+                    chosen = randInt(0, num_cols - 1);
+                }
+                result[row][chosen] = 1;
+                previous = chosen;
+            }
+
+            return result;
+        }
+
+        function makeDraft() {
+            let treadling_matrix = randomWalkMatrix(num_weft_threads, num_pedals);
+            let threading_matrix = transpose(randomWalkMatrix(num_warp_threads, num_frames));
+            let num_independent_rows_of_tie_up = Math.min(num_frames, pattern_height); //randInt(1, num_frames)
+            let num_independent_cols_of_tie_up = Math.min(num_pedals, pattern_length)
+            let repeating_pattern = makeRepeatingPattern(
+                num_independent_rows_of_tie_up, num_independent_cols_of_tie_up)
+            let tie_up = repeating_pattern.make_binary_matrix(num_frames, num_pedals)
+            let colsums = colsum(tie_up)
+            // don't want any column of tie-up to be all ones or all zeros
+            for (let i = 0; i < colsums.length; ++i) {
+                if (colsums[i] == 0) {
+                    tie_up[randInt(0, num_frames - 1)][i] = true;
+                }
+                while (colsum(tie_up)[i] >= num_frames - 1) {
+                    tie_up[randInt(0, num_frames - 1)][i] = false;
+                }
+            }
+            return new Draft(threading_matrix, tie_up, treadling_matrix);
+        }
+
         function setup() {
             base_row_hue = randInt(1, 100);
             base_col_hue = randInt(base_row_hue + 50, 360);
-            program = makeProgram(pattern_height, pattern_length);
+            program = makeDraft();
         }
 
         function regenerate() {
             setSeed(parseInt(document.getElementById("seed").value));
+            num_warp_threads = parseInt(document.getElementById("warp-threads").value);
+            num_weft_threads = parseInt(document.getElementById("weft-threads").value);
+            num_frames = parseInt(document.getElementById("frames").value);
+            num_pedals = parseInt(document.getElementById("pedals").value);
             transition_prob = parseFloat(document.getElementById("prob").value);
             pixels_per_thread = parseInt(document.getElementById("pixels-per-thread").value);
-            pattern_length = parseInt(document.getElementById("pattern-length").value);
             pattern_height = parseInt(document.getElementById("pattern-height").value);
+            pattern_length = parseInt(document.getElementById("pattern-length").value);
+
 
             setup();
             draw();
@@ -144,6 +270,10 @@
         let reactive_sliders = [
             "seed",
             "prob",
+            "warp-threads",
+            "weft-threads",
+            "frames",
+            "pedals",
             "pixels-per-thread",
             "pattern-length",
             "pattern-height",
@@ -196,6 +326,13 @@
         function draw_matrix(ctx, matrix, col_hsl, row_hsl) {
              let num_weft_threads = matrix.length;
              let num_warp_threads = matrix[0].length;
+             if (col_hsl.length < num_warp_threads) {
+                 alert(`Too few colors (${col_hsl.length}) for ${num_warp_threads} warp threads`);
+             }
+
+             if (row_hsl.length < num_weft_threads) {
+                 alert(`Too few colors (${row_hsl.length}) for ${num_weft_threads} warp threads`);
+             }
              for (let col = 0; col < num_warp_threads; ++col) {
                 const start_x = col * pixels_per_thread;
                 const end_x = (col + 1) * pixels_per_thread;
@@ -250,40 +387,81 @@
         function get_canvas_context(canvas_id) {
             var canvas = document.getElementById(canvas_id);
             var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            return [ctx, canvas.width, canvas.height];
+            return [ctx, canvas];
         }
 
         function draw_color_palette() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("color-palette");
+            let [ctx, canvas] = get_canvas_context("color-palette");
+
 
         }
         function draw_warp_colors() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("warp-colors");
+            let [ctx, canvas] = get_canvas_context("warp-colors");
+            canvas.width = num_warp_threads * pixels_per_thread;
+            canvas.height = 2 * pixels_per_thread;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = pixels_per_thread;
         }
         function draw_weft_colors() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("weft-colors");
+            let [ctx, canvas] = get_canvas_context("weft-colors");
+            canvas.width = 2 * pixels_per_thread;
+            canvas.height = num_weft_threads * pixels_per_thread;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = pixels_per_thread;
         }
 
         function draw_threading() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("threading");
+            let [ctx, canvas] = get_canvas_context("threading");
+
+            canvas.width = num_warp_threads * pixels_per_thread;
+            canvas.height = num_frames * pixels_per_thread;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById("threading-cell").width = canvas.width;
+            document.getElementById("threading-cell").height = canvas.height;
+
+            ctx.lineWidth = pixels_per_thread;
+            const col_hsl = warp_colors(num_warp_threads);
+            const row_hsl = weft_colors(num_frames)
+            draw_matrix(ctx, program.threading_matrix, col_hsl, row_hsl);
 
         }
         function draw_treadling() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("treadling");
+            let [ctx, canvas] = get_canvas_context("treadling");
+            canvas.width = num_pedals * pixels_per_thread;
+            canvas.height = num_weft_threads * pixels_per_thread;
+
+            document.getElementById("treadling-cell").width = canvas.width;
+            document.getElementById("treadling-cell").height = canvas.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = pixels_per_thread;
+            const col_hsl = warp_colors(num_pedals);
+            const row_hsl = weft_colors(num_weft_threads)
+            draw_matrix(ctx, program.treadling_matrix, col_hsl, row_hsl);
         }
+
         function draw_tieup() {
-            [ctx, canvas_width, canvas_height] = get_canvas_context("tie-up");
+            let [ctx, canvas] = get_canvas_context("tie-up");
+            canvas.width = num_pedals * pixels_per_thread;
+            canvas.height = num_frames * pixels_per_thread;
+            document.getElementById("tie-up-cell").width = canvas.width;
+            document.getElementById("tie-up-cell").height = canvas.height;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = pixels_per_thread;
+            const col_hsl = warp_colors(num_pedals);
+            const row_hsl = weft_colors(num_frames)
+            draw_matrix(ctx, program.tie_up,  col_hsl, row_hsl);
         }
         function draw_weave() {
 
-            [ctx, max_pixels_x, max_pixels_y] = get_canvas_context("weave");
-
-            //ctx.translate(0.5,0.5);
+            [ctx, canvas] = get_canvas_context("weave");
+            canvas.width = num_warp_threads * pixels_per_thread;
+            canvas.height = num_weft_threads * pixels_per_thread;
+            document.getElementById("weave-cell").width = canvas.width;
+            document.getElementById("weave-cell").height = canvas.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.lineWidth = pixels_per_thread;
 
-            const num_warp_threads = max_pixels_x / pixels_per_thread;
-            const num_weft_threads = max_pixels_y / pixels_per_thread;
 
             const col_hsl = warp_colors(num_warp_threads);
             const row_hsl = weft_colors(num_weft_threads)
@@ -292,8 +470,7 @@
             ctx.lineCap='round';
             ctx.lineJoin='round';
             */
-
-            const matrix = program.make_binary_matrix(num_weft_threads, num_warp_threads)
+            const matrix = program.make_binary_matrix(); // num_weft_threads, num_warp_threads)
             draw_matrix(ctx, matrix, col_hsl, row_hsl);
         }
         window.addEventListener("load", onload);
@@ -301,10 +478,55 @@
 </head>
 <body>
 
-<table border="1">
+
+<div class="inputWrapper">
+    <group>
+        <label>Seed</label>
+        <input type="range" id="seed" value="10" min="8" max="1000" step="1">
+    </group>
+    <group>
+        <label>Warp threads</label>
+        <input type="range" id="warp-threads"  value="150" min="10" max="1000" step="10">
+    </group>
+    <group>
+        <label>Weft threads</label>
+        <input type="range" id="weft-threads"  value="100" min="10" max="1000" step="10">
+    </group>
+
+    <group>
+        <label>Frames</label>
+        <input type="range" id="frames"  value="4" min="2" max="64" step="1">
+    </group>
+    <group>
+        <label>Pedals</label>
+        <input type="range" id="pedals"  value="10" min="2" max="150" step="1">
+    </group>
+</div>
+<div class="inputWrapper">
+    <group>
+        <label>Prob transition</label>
+        <input type="range" id="prob"  value="0.25" min="0" max="1" step="0.01">
+    </group>
+    <group>
+        <label>Pixels per thread</label>
+        <input type="range" id="pixels-per-thread"  value="4" min="1" max="10" step="1">
+    </group>
+    <group>
+        <label>Pattern length</label>
+        <input type="range" id="pattern-length" value="4" min="2" max="16" step="1">
+    </group>
+
+     <group>
+        <label>Pattern height</label>
+        <input type="range" id="pattern-height" value="1" min="1" max="16" step="1">
+    </group>
+    <button id="link">🔗</button>
+</div>
+<div id="draft-container">
+<table>
     <tr>
         <td colspan="3">
-            <canvas id="color-palette" style="height: 0px;" ></canvas>
+            <canvas id="color-palette" style="height:0px;"></canvas>
         </td>
     </tr>
     <tr>
@@ -313,40 +535,18 @@
         </td>
     </tr>
     <tr>
-        <td><canvas id="threading" style="height:10px;"></canvas></td>
-        <td colspan="2"><canvas id="tie-up" style="height: 10px;"></canvas></td>
+        <td id="threading-cell"><canvas id="threading" ></canvas></td>
+        <td id="tie-up-cell"><canvas id="tie-up"></canvas></td>
+        <td></td>
     </tr>
     <tr>
-        <td><canvas id="weave" class="squareCanvas"></canvas></td>
-        <td><canvas id="treadling" style="width:10px;"></canvas></td>
-        <td><canvas id="weft-colors" style="width: 10px;"></canvas></td>
+        <td id="weave-cell"><canvas id="weave"></canvas></td>
+        <td id="treadling-cell"><canvas id="treadling"></canvas></td>
+        <td><canvas id="weft-colors"></canvas></td>
     </tr>
 
 </table>
-
-<div class="inputWrapper">
-    <group>
-        <label>Seed</label>
-        <input type="range" id="seed" value="10" min="8" max="1000" step="1">
-    </group>
-    <group>
-        <label>Prob transition</label>
-        <input type="range" id="prob"  value="0.25" min="0" max="1" step="0.01">
-    </group>
-    <group>
-        <label>Pixels per thread</label>
-        <input type="range" id="pixels-per-thread"  value="10" min="2" max="10" step="4">
-    </group>
-    <group>
-        <label>Pattern length</label>
-        <input type="range" id="pattern-length" value="10" min="1" max="200" step="1">
-    </group>
-
-     <group>
-        <label>Pattern height</label>
-        <input type="range" id="pattern-height" value="2" min="1" max="20" step="1">
-    </group>
-    <button id="link">🔗</button>
 </div>
+
 </body>
 </html>
