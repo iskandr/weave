@@ -29,10 +29,18 @@ function fill1d(a, v) {
     }
 }
 
-function zeros1d(n) {
+function const_array_1d(n, v) {
     let result = new Array(n);
-    fill1d(result, 0);
+    fill1d(result, v);
     return result;
+}
+
+function zeros1d(n) {
+    return const_array_1d(n, 0);
+}
+
+function ones1d(n) {
+     return const_array_1d(n, 1);
 }
 
 function fill2d(a, v) {
@@ -42,12 +50,21 @@ function fill2d(a, v) {
         }
     }
 }
-
-function zeros2d(nrows, ncols) {
+function const_array_2d(nrows, ncols, v) {
     let result = array2d(nrows, ncols);
-    fill2d(result, 0);
+    fill2d(result, v);
     return result;
 }
+
+function zeros2d(nrows, ncols) {
+    return const_array_2d(nrows, ncols, 0);
+}
+
+function ones2d(nrows, ncols) {
+    return const_array_2d(nrows, ncols, 1);
+}
+
+
 
 function imap_fill1d(a, f) {
     for (let i = 0; i < a.length; ++i) {
@@ -189,6 +206,26 @@ function binary_matmult(A, B) {
     return result;
 }
 
+function assertEq(A, B) {
+    let [ar, ac] = size(A);
+    let [br, bc] = size(B);
+    if (ar != br || ac != bc) {
+        alert(`Expected sizes to be same but got ${ar}*${ac} vs. ${br}*${bc}`);
+    }
+    for (let i = 0; i < ar; ++i) {
+        for (let j = 0; j < ac; ++j) {
+            if (A[i][j] != B[i][j]) {
+                 alert(`Expected equal arrays but different values at ${i}, ${j}: ${A[i][j]} vs. ${B[i][j]}`);
+            }
+        }
+    }
+    
+    
+}
+
+assertEq(binary_matmult(
+    [[true, false],[false, true]],
+    [[true, true,],[true, false]]), [[true, true,],[true, false]])
 
 function transpose(A) {
     let [ar, ac] = size(A);
